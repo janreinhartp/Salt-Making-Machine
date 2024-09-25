@@ -2,10 +2,35 @@
 #include "control.h"
 #include <Preferences.h>
 
+#include "PCF8575.h"
+PCF8575 pcf8575(0x22);
+
 // Declaration for LCD
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+int rHeater = P0;
+int rWaterValve = P1;
+int rVacuum = P2;
+int rReleaseVacuum = P3;
+
+void initRelays()
+{
+    pcf8575.pinMode(rHeater, OUTPUT);
+    pcf8575.digitalWrite(rHeater, HIGH);
+
+    pcf8575.pinMode(rWaterValve, OUTPUT);
+    pcf8575.digitalWrite(rWaterValve, HIGH);
+
+    pcf8575.pinMode(rVacuum, OUTPUT);
+    pcf8575.digitalWrite(rVacuum, HIGH);
+
+    pcf8575.pinMode(rReleaseVacuum, OUTPUT);
+    pcf8575.digitalWrite(rReleaseVacuum, HIGH);
+
+    pcf8575.begin();
+}
 
 byte enterChar[] = {
     B10000,
@@ -74,13 +99,13 @@ Control Vacuum(0);
 Control WaterValve(0);
 Control VacuumRelease(0);
 
-static const int buttonPin = 2;
+static const int buttonPin = 12;
 int buttonStatePrevious = HIGH;
 
-static const int buttonPin2 = 3;
+static const int buttonPin2 = 15;
 int buttonStatePrevious2 = HIGH;
 
-static const int buttonPin3 = 4;
+static const int buttonPin3 = 13;
 int buttonStatePrevious3 = HIGH;
 
 unsigned long minButtonLongPressDuration = 2000;
@@ -447,10 +472,12 @@ void readButtonEnterState()
                         if (Heater.getMotorState() == false)
                         {
                             Heater.relayOn();
+                            pcf8575.digitalWrite(rHeater, false);
                         }
                         else
                         {
                             Heater.relayOff();
+                            pcf8575.digitalWrite(rHeater, true);
                         }
                     }
                     else if (currentTestMenuScreen == 1)
@@ -458,10 +485,12 @@ void readButtonEnterState()
                         if (Vacuum.getMotorState() == false)
                         {
                             Vacuum.relayOn();
+                            pcf8575.digitalWrite(rVacuum, false);
                         }
                         else
                         {
                             Vacuum.relayOff();
+                            pcf8575.digitalWrite(rVacuum, true);
                         }
                     }
                     else if (currentTestMenuScreen == 2)
@@ -469,10 +498,12 @@ void readButtonEnterState()
                         if (VacuumRelease.getMotorState() == false)
                         {
                             VacuumRelease.relayOn();
+                            pcf8575.digitalWrite(rReleaseVacuum, false);
                         }
                         else
                         {
                             VacuumRelease.relayOff();
+                            pcf8575.digitalWrite(rReleaseVacuum, true);
                         }
                     }
                     else if (currentTestMenuScreen == 3)
@@ -480,10 +511,12 @@ void readButtonEnterState()
                         if (WaterValve.getMotorState() == false)
                         {
                             WaterValve.relayOn();
+                            pcf8575.digitalWrite(rWaterValve, false);
                         }
                         else
                         {
                             WaterValve.relayOff();
+                            pcf8575.digitalWrite(rWaterValve, true);
                         }
                     }
                 }
@@ -521,8 +554,13 @@ void ReadButtons()
 
 void initializeLCD()
 {
-    lcd.init(); // initialize the lcd
+    lcd.init();
+    lcd.clear();
+    lcd.createChar(0, enterChar);
+    lcd.createChar(1, fastChar);
+    lcd.createChar(2, slowChar);
     lcd.backlight();
+    refreshScreen = true;
 }
 
 void printTestScreen(String TestMenuTitle, String Job, bool Status, bool ExitFlag)
@@ -568,13 +606,99 @@ void printMainMenu(String MenuItem, String Action)
     refreshScreen = false;
 }
 
+void printSettingScreen(String SettingTitle, String Unit, int Value, bool EditFlag, bool SaveFlag)
+{
+    lcd.clear();
+    lcd.print(SettingTitle);
+    lcd.setCursor(0, 1);
+
+    if (SaveFlag == true)
+    {
+        lcd.setCursor(0, 3);
+        lcd.write(0);
+        lcd.setCursor(2, 3);
+        lcd.print("ENTER TO SAVE ALL");
+    }
+    else
+    {
+        lcd.print(Value);
+        lcd.print(" ");
+        lcd.print(Unit);
+        lcd.setCursor(0, 3);
+        lcd.write(0);
+        lcd.setCursor(2, 3);
+        if (EditFlag == false)
+        {
+            lcd.print("ENTER TO EDIT");
+        }
+        else
+        {
+            lcd.print("ENTER TO SAVE");
+        }
+    }
+    refreshScreen = false;
+}
+
+void printScreen()
+{
+    if (settingFlag == true)
+    {
+        if (currentSettingScreen == NUM_SETTING_ITEMS - 1)
+        {
+            printSettingScreen(setting_items[currentSettingScreen][0], setting_items[currentSettingScreen][1], parametersTimer[currentSettingScreen], settingEditFlag, true);
+        }
+        else
+        {
+            printSettingScreen(setting_items[currentSettingScreen][0], setting_items[currentSettingScreen][1], parametersTimer[currentSettingScreen], settingEditFlag, false);
+        }
+    }
+    else if (testMenuFlag == true)
+    {
+        switch (currentTestMenuScreen)
+        {
+        case 0:
+            // printTestScreen(testmachine_items[currentTestMenuScreen], "Status", ContactorVFD.getMotorState(), false);
+            printTestScreen(testmachine_items[currentTestMenuScreen], "Status", Heater.getMotorState(), false);
+            break;
+        case 1:
+            printTestScreen(testmachine_items[currentTestMenuScreen], "Status", Vacuum.getMotorState(), false);
+            break;
+        case 2:
+            printTestScreen(testmachine_items[currentTestMenuScreen], "Status", VacuumRelease.getMotorState(), false);
+            break;
+        case 3:
+            printTestScreen(testmachine_items[currentTestMenuScreen], "Status", WaterValve.getMotorState(), false);
+            break;
+        case 4:
+            printTestScreen(testmachine_items[currentTestMenuScreen], "", true, true);
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {
+        printMainMenu(menu_items[currentMainScreen][0], menu_items[currentMainScreen][1]);
+    }
+}
+
 void setup()
 {
     Serial.begin(9600);
-    initializeLCD()
+    initializeLCD();
+    pinMode(buttonPin, INPUT_PULLUP);
+    pinMode(buttonPin2, INPUT_PULLUP);
+    pinMode(buttonPin3, INPUT_PULLUP);
+
+    initRelays();
 }
 
 void loop()
 {
     ReadButtons();
+    if (refreshScreen == true)
+    {
+        printScreen();
+        refreshScreen = false;
+    }
 }
