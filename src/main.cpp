@@ -519,12 +519,62 @@ void ReadButtons()
     readButtonDownState();
 }
 
+void initializeLCD()
+{
+    lcd.init(); // initialize the lcd
+    lcd.backlight();
+}
+
+void printTestScreen(String TestMenuTitle, String Job, bool Status, bool ExitFlag)
+{
+    lcd.clear();
+    lcd.print(TestMenuTitle);
+    if (ExitFlag == false)
+    {
+        lcd.setCursor(0, 2);
+        lcd.print(Job);
+        lcd.print(" : ");
+        if (Status == true)
+        {
+            lcd.print("ON");
+        }
+        else
+        {
+            lcd.print("OFF");
+        }
+    }
+
+    if (ExitFlag == true)
+    {
+        lcd.setCursor(0, 3);
+        lcd.print("Click to Exit Test");
+    }
+    else
+    {
+        lcd.setCursor(0, 3);
+        lcd.print("Click to Run Test");
+    }
+    refreshScreen = false;
+}
+
+void printMainMenu(String MenuItem, String Action)
+{
+    lcd.clear();
+    lcd.print(MenuItem);
+    lcd.setCursor(0, 3);
+    lcd.write(0);
+    lcd.setCursor(2, 3);
+    lcd.print(Action);
+    refreshScreen = false;
+}
+
 void setup()
 {
-    // put your setup code here, to run once:
+    Serial.begin(9600);
+    initializeLCD()
 }
 
 void loop()
 {
-    // put your main code here, to run repeatedly:
+    ReadButtons();
 }
