@@ -109,6 +109,13 @@ Control VacuumRelease(0);
 Control TimerCooking(0);
 Control TimerDrying(0);
 
+void stopAllMotors()
+{
+    pcf8575.digitalWrite(rWaterValve, HIGH);
+    pcf8575.digitalWrite(rReleaseVacuum, HIGH);
+    pcf8575.digitalWrite(rVacuum, HIGH);
+    pcf8575.digitalWrite(rHeater, HIGH);
+}
 char *secondsToHHMMSS(int total_seconds)
 {
     int hours, minutes, seconds;
@@ -176,6 +183,10 @@ const int intervalButton3 = 50;
 unsigned long previousButtonMillis3;
 unsigned long buttonPressDuration3;
 unsigned long currentMillis3;
+
+unsigned long currentMillisRunAuto;
+unsigned long previousMillisRunAuto;
+unsigned long intervalRunAuto = 1000;
 
 void InitializeButtons()
 {
@@ -514,7 +525,7 @@ void readButtonEnterState()
                         currentMainScreen = 0;
                         currentTestMenuScreen = 0;
                         testMenuFlag = false;
-                        // stopAll();
+                        stopAllMotors();
                     }
                     else if (currentTestMenuScreen == 0)
                     {
@@ -569,6 +580,13 @@ void readButtonEnterState()
                         }
                     }
                 }
+                else if (currentMainScreen == 2 && runAutoFlag == true)
+                {
+                    stopAllMotors();
+                    runAutoFlag = false;
+                    runAutoStatus = 0;
+                    runCookingStatus = 0;
+                }
                 else
                 {
                     if (currentMainScreen == 0)
@@ -581,6 +599,10 @@ void readButtonEnterState()
                     }
                     else if (currentMainScreen == 2)
                     {
+                        runAutoFlag = true;
+                        runAutoStatus = 1;
+                        runCookingStatus = 1;
+                        TimerCooking.start();
                     }
                 }
             }
@@ -765,14 +787,6 @@ void printScreen()
     }
 }
 
-void stopAllMotors()
-{
-    pcf8575.digitalWrite(rWaterValve, HIGH);
-    pcf8575.digitalWrite(rReleaseVacuum, HIGH);
-    pcf8575.digitalWrite(rVacuum, HIGH);
-    pcf8575.digitalWrite(rHeater, HIGH);
-}
-
 void runAuto()
 {
     /*Flow
@@ -801,6 +815,7 @@ void runAuto()
             if (TimerCooking.isTimerCompleted() == true)
             {
                 runAutoStatus = 2;
+                TimerDrying.start();
                 stopAllMotors();
             }
             else
@@ -887,5 +902,17 @@ void loop()
     {
         printScreen();
         refreshScreen = false;
+    }
+
+    if (runAutoFlag == true)
+    {
+        runAuto();
+
+        unsigned long currentMillisRunAuto = millis();
+        if (currentMillisRunAuto - previousMillisRunAuto >= intervalRunAuto)
+        {
+            previousMillisRunAuto = currentMillisRunAuto;
+            refreshScreen = true;
+        }
     }
 }
