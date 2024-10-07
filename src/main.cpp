@@ -15,28 +15,15 @@ int rWaterValve = P1;
 int rVacuum = P2;
 int rReleaseVacuum = P3;
 
-Preferences Settings;
+int LowLevelSensor = 4;
+int HighLevelSensor = 25;
 
-void saveSettings()
-{
-    Settings.putInt("cookingtime", parametersTimer[0]);
-    Settings.putInt("dryingtime", parametersTimer[1]);
-    Serial.println("---- Saving Timer  Settings ----");
-    Serial.println("Cooking Time : " + String(parametersTimer[0]));
-    Serial.println("Drying Time : " + String(parametersTimer[1]));
-    Serial.println("---- Saving Timer  Settings ----");
-}
-void loadSettings()
-{
-    Serial.println("---- Start Reading Settings ----");
-    parametersTimer[2] = Settings.getInt("cookingtime");
-    parametersTimer[1] = Settings.getInt("dryingtime");
-    Serial.println("Pump Timer : " + String(parametersTimer[2]));
-    Serial.println("Pump Bleach Timer : " + String(parametersTimer[1]));
-    Serial.println("---- End Reading Settings ----");
-    // Starch.setTimer(secondsToHHMMSS(parametersTimer[0]));
-    // Bleach.setTimer(secondsToHHMMSS(parametersTimer[1]));
-}
+int runAutoStatus = 0;
+int runCookingStatus = 0;
+
+bool LowLevelStatus, HighLevelStatus = false;
+
+Preferences Settings;
 
 void initRelays()
 {
@@ -92,7 +79,7 @@ const int NUM_TESTMACHINE_ITEMS = 5;
 int currentMainScreen;
 int currentSettingScreen;
 int currentTestMenuScreen;
-bool menuFlag, settingFlag, settingEditFlag, testMenuFlag, refreshScreen = false;
+bool settingFlag, settingEditFlag, testMenuFlag, runAutoFlag, refreshScreen = false;
 
 String menu_items[NUM_MAIN_ITEMS][2] = { // array with item names
     {"SETTING", "ENTER TO EDIT"},
@@ -104,7 +91,6 @@ String setting_items[NUM_SETTING_ITEMS][2] = { // array with item names
     {"DRYING TIME", "MIN"},
     {"SAVE"}};
 
-Preferences Settings;
 int parametersTimer[NUM_SETTING_ITEMS] = {1, 1, 1};
 int parametersTimerMaxValue[NUM_SETTING_ITEMS] = {1200, 1200, 1200};
 
@@ -119,6 +105,45 @@ Control Heater(0);
 Control Vacuum(0);
 Control WaterValve(0);
 Control VacuumRelease(0);
+
+Control TimerCooking(0);
+Control TimerDrying(0);
+
+char *secondsToHHMMSS(int total_seconds)
+{
+    int hours, minutes, seconds;
+
+    hours = total_seconds / 3600;         // Divide by number of seconds in an hour
+    total_seconds = total_seconds % 3600; // Get the remaining seconds
+    minutes = total_seconds / 60;         // Divide by number of seconds in a minute
+    seconds = total_seconds % 60;         // Get the remaining seconds
+
+    // Format the output string
+    static char hhmmss_str[7]; // 6 characters for HHMMSS + 1 for null terminator
+    sprintf(hhmmss_str, "%02d%02d%02d", hours, minutes, seconds);
+    return hhmmss_str;
+}
+
+void saveSettings()
+{
+    Settings.putInt("cookingtime", parametersTimer[0]);
+    Settings.putInt("dryingtime", parametersTimer[1]);
+    Serial.println("---- Saving Timer  Settings ----");
+    Serial.println("Cooking Time : " + String(parametersTimer[0]));
+    Serial.println("Drying Time : " + String(parametersTimer[1]));
+    Serial.println("---- Saving Timer  Settings ----");
+}
+void loadSettings()
+{
+    Serial.println("---- Start Reading Settings ----");
+    parametersTimer[0] = Settings.getInt("cookingtime");
+    parametersTimer[1] = Settings.getInt("dryingtime");
+    Serial.println("Pump Timer : " + String(parametersTimer[0]));
+    Serial.println("Pump Bleach Timer : " + String(parametersTimer[1]));
+    Serial.println("---- End Reading Settings ----");
+    TimerCooking.setTimer(secondsToHHMMSS(parametersTimer[0] * 60));
+    TimerDrying.setTimer(secondsToHHMMSS(parametersTimer[1] * 60));
+}
 
 static const int buttonPin = 12;
 int buttonStatePrevious = HIGH;
@@ -157,6 +182,9 @@ void InitializeButtons()
     pinMode(buttonPin, INPUT_PULLUP);
     pinMode(buttonPin2, INPUT_PULLUP);
     pinMode(buttonPin3, INPUT_PULLUP);
+
+    pinMode(LowLevelSensor, INPUT_PULLUP);
+    pinMode(HighLevelSensor, INPUT_PULLUP);
 }
 
 void readButtonUpState()
@@ -462,8 +490,8 @@ void readButtonEnterState()
                     if (currentSettingScreen == NUM_SETTING_ITEMS - 1)
                     {
                         settingFlag = false;
-                        // saveSettings();
-                        // loadSettings();
+                        saveSettings();
+                        loadSettings();
                         currentSettingScreen = 0;
                         // setTimers();
                     }
@@ -553,8 +581,6 @@ void readButtonEnterState()
                     }
                     else if (currentMainScreen == 2)
                     {
-                        // sensor.resetCount();
-                        // saveCount(0);
                     }
                 }
             }
@@ -660,6 +686,17 @@ void printSettingScreen(String SettingTitle, String Unit, int Value, bool EditFl
     refreshScreen = false;
 }
 
+void printRunAuto(String SettingTitle, String Process, String TimeRemaining)
+{
+    lcd.clear();
+    lcd.print(SettingTitle);
+    lcd.setCursor(0, 1);
+    lcd.print(Process);
+    lcd.setCursor(0, 2);
+    lcd.print(TimeRemaining);
+    refreshScreen = false;
+}
+
 void printScreen()
 {
     if (settingFlag == true)
@@ -697,9 +734,135 @@ void printScreen()
             break;
         }
     }
+    else if (runAutoFlag == true)
+    {
+        switch (runAutoStatus)
+        {
+        case 1:
+            switch (runCookingStatus)
+            {
+            case 1:
+                printRunAuto("Cooking", "Pouring Water", TimerCooking.getTimeRemaining());
+                break;
+            case 2:
+                printRunAuto("Cooking", "Boiling", TimerCooking.getTimeRemaining());
+                break;
+            default:
+                break;
+            }
+            break;
+
+        case 2:
+            printRunAuto("Drying", "N/A", TimerDrying.getTimeRemaining());
+            break;
+        default:
+            break;
+        }
+    }
     else
     {
         printMainMenu(menu_items[currentMainScreen][0], menu_items[currentMainScreen][1]);
+    }
+}
+
+void stopAllMotors()
+{
+    pcf8575.digitalWrite(rWaterValve, HIGH);
+    pcf8575.digitalWrite(rReleaseVacuum, HIGH);
+    pcf8575.digitalWrite(rVacuum, HIGH);
+    pcf8575.digitalWrite(rHeater, HIGH);
+}
+
+void runAuto()
+{
+    /*Flow
+    Case 1 - Cook until Timer is done
+        Case 1.1 - Check for Water Level
+            If Water Level is not HIGH
+                Open Water Valve/Release Pressure and wait for the Sensor to tell High Level
+            Then
+                Move to Case 1.2
+        Case 1.2 - Boil the water until Low Level
+            If Water Level is not LOW
+                Heater and Vacuum On
+            then
+                Move to Case 1.1
+
+    Case 2 -
+        Run the Vacuum and Heater until Desired Time
+
+    */
+    switch (runAutoStatus)
+    {
+    case 1:
+        if (TimerCooking.isStopped() == false)
+        {
+            TimerCooking.run();
+            if (TimerCooking.isTimerCompleted() == true)
+            {
+                runAutoStatus = 2;
+                stopAllMotors();
+            }
+            else
+            {
+                switch (runCookingStatus)
+                {
+                case 1:
+                    if (HighLevelStatus = true && LowLevelStatus == true)
+                    {
+                        runCookingStatus = 2;
+                        pcf8575.digitalWrite(rWaterValve, HIGH);
+                        pcf8575.digitalWrite(rReleaseVacuum, HIGH);
+                    }
+                    else
+                    {
+                        pcf8575.digitalWrite(rWaterValve, LOW);
+                        pcf8575.digitalWrite(rReleaseVacuum, LOW);
+                        pcf8575.digitalWrite(rVacuum, HIGH);
+                        pcf8575.digitalWrite(rHeater, HIGH);
+                    }
+
+                    break;
+                case 2:
+                    if (HighLevelStatus = false && LowLevelStatus == false)
+                    {
+                        runCookingStatus = 1;
+                        pcf8575.digitalWrite(rVacuum, HIGH);
+                        pcf8575.digitalWrite(rHeater, HIGH);
+                    }
+                    else
+                    {
+                        pcf8575.digitalWrite(rVacuum, LOW);
+                        pcf8575.digitalWrite(rHeater, LOW);
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        break;
+
+    case 2:
+        if (TimerDrying.isStopped() == false)
+        {
+            TimerDrying.run();
+            if (TimerDrying.isTimerCompleted() == true)
+            {
+                runAutoStatus = 0;
+            }
+            else
+            {
+                pcf8575.digitalWrite(rVacuum, LOW);
+                pcf8575.digitalWrite(rHeater, LOW);
+            }
+        }
+        break;
+    default:
+        runAutoStatus = 0;
+        runCookingStatus = 0;
+        stopAllMotors();
+        break;
     }
 }
 
@@ -712,6 +875,9 @@ void setup()
     pinMode(buttonPin3, INPUT_PULLUP);
     Settings.begin("timerSetting", false);
     initRelays();
+
+    // saveSettings();
+    loadSettings();
 }
 
 void loop()
