@@ -15,6 +15,29 @@ int rWaterValve = P1;
 int rVacuum = P2;
 int rReleaseVacuum = P3;
 
+Preferences Settings;
+
+void saveSettings()
+{
+    Settings.putInt("cookingtime", parametersTimer[0]);
+    Settings.putInt("dryingtime", parametersTimer[1]);
+    Serial.println("---- Saving Timer  Settings ----");
+    Serial.println("Cooking Time : " + String(parametersTimer[0]));
+    Serial.println("Drying Time : " + String(parametersTimer[1]));
+    Serial.println("---- Saving Timer  Settings ----");
+}
+void loadSettings()
+{
+    Serial.println("---- Start Reading Settings ----");
+    parametersTimer[2] = Settings.getInt("cookingtime");
+    parametersTimer[1] = Settings.getInt("dryingtime");
+    Serial.println("Pump Timer : " + String(parametersTimer[2]));
+    Serial.println("Pump Bleach Timer : " + String(parametersTimer[1]));
+    Serial.println("---- End Reading Settings ----");
+    // Starch.setTimer(secondsToHHMMSS(parametersTimer[0]));
+    // Bleach.setTimer(secondsToHHMMSS(parametersTimer[1]));
+}
+
 void initRelays()
 {
     pcf8575.pinMode(rHeater, OUTPUT);
@@ -63,7 +86,7 @@ byte slowChar[] = {
 
 // Declaration of LCD Variables
 const int NUM_MAIN_ITEMS = 3;
-const int NUM_SETTING_ITEMS = 5;
+const int NUM_SETTING_ITEMS = 3;
 const int NUM_TESTMACHINE_ITEMS = 5;
 
 int currentMainScreen;
@@ -77,15 +100,13 @@ String menu_items[NUM_MAIN_ITEMS][2] = { // array with item names
     {"RUN AUTO", "ENTER TO RUN AUTO"}};
 
 String setting_items[NUM_SETTING_ITEMS][2] = { // array with item names
-    {"MOTOR RUN", "SEC"},
-    {"SET TIME", "24 HR SETTING"},
-    {"SET MAX PRESSURE", "PSI RELEASE"},
-    {"SAVING INTERVAL", "MIN"},
+    {"COOKING TIME", "MIN"},
+    {"DRYING TIME", "MIN"},
     {"SAVE"}};
 
 Preferences Settings;
-int parametersTimer[NUM_SETTING_ITEMS] = {1, 1, 1, 1};
-int parametersTimerMaxValue[NUM_SETTING_ITEMS] = {1200, 24, 10, 60};
+int parametersTimer[NUM_SETTING_ITEMS] = {1, 1, 1};
+int parametersTimerMaxValue[NUM_SETTING_ITEMS] = {1200, 1200, 1200};
 
 String testmachine_items[NUM_TESTMACHINE_ITEMS] = { // array with item names
     "HEATER",
@@ -689,7 +710,7 @@ void setup()
     pinMode(buttonPin, INPUT_PULLUP);
     pinMode(buttonPin2, INPUT_PULLUP);
     pinMode(buttonPin3, INPUT_PULLUP);
-
+    Settings.begin("timerSetting", false);
     initRelays();
 }
 
