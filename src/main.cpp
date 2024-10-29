@@ -15,8 +15,8 @@ int rWaterValve = P1;
 int rVacuum = P2;
 int rReleaseVacuum = P3;
 
-int LowLevelSensor = 4;
-int HighLevelSensor = 25;
+int LowLevelSensor = 27;
+int HighLevelSensor = 4;
 
 int runAutoStatus = 0;
 int runCookingStatus = 0;
@@ -194,8 +194,8 @@ void InitializeButtons()
     pinMode(buttonPin2, INPUT_PULLUP);
     pinMode(buttonPin3, INPUT_PULLUP);
 
-    pinMode(LowLevelSensor, INPUT_PULLUP);
-    pinMode(HighLevelSensor, INPUT_PULLUP);
+    pinMode(LowLevelSensor, INPUT);
+    pinMode(HighLevelSensor, INPUT);
 }
 
 void readButtonUpState()
@@ -619,6 +619,29 @@ void ReadButtons()
     readButtonEnterState();
     readButtonUpState();
     readButtonDownState();
+
+    if (digitalRead(HighLevelSensor) == true)
+    {
+        HighLevelStatus = false;
+    }
+    else
+    {
+        HighLevelStatus = true;
+    }
+
+    // Serial.print("High Level Status: ");
+    // Serial.println(HighLevelStatus);
+
+    if (digitalRead(LowLevelSensor) == true)
+    {
+        LowLevelStatus = false;
+    }
+    else
+    {
+        LowLevelStatus = true;
+    }
+    // Serial.print("Low Level Status: ");
+    // Serial.println(LowLevelStatus);
 }
 
 void initializeLCD()
@@ -823,7 +846,7 @@ void runAuto()
                 switch (runCookingStatus)
                 {
                 case 1:
-                    if (HighLevelStatus = true && LowLevelStatus == true)
+                    if (HighLevelStatus == 1 && LowLevelStatus == 1)
                     {
                         runCookingStatus = 2;
                         pcf8575.digitalWrite(rWaterValve, HIGH);
@@ -839,7 +862,7 @@ void runAuto()
 
                     break;
                 case 2:
-                    if (HighLevelStatus = false && LowLevelStatus == false)
+                    if (HighLevelStatus == 0 && LowLevelStatus == 0)
                     {
                         runCookingStatus = 1;
                         pcf8575.digitalWrite(rVacuum, HIGH);
