@@ -899,7 +899,9 @@ void runAuto()
     default:
         runAutoStatus = 0;
         runCookingStatus = 0;
+        runAutoFlag = false;
         stopAllMotors();
+        refreshScreen = true;
         break;
     }
 }
